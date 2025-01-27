@@ -15,4 +15,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app
 
 # Run the Python script when the container launches
-CMD ["python", "webserver.py", "--git-repo-dir", "$GIT_REPO_DIR"]
+CMD ["sh", "-c", "python webserver.py --git-repo-dir $GIT_REPO_DIR"]
