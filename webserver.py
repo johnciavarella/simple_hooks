@@ -55,13 +55,12 @@ app = Flask(__name__)
 @app.route('/webhook/<path:subpath>', methods=['POST'])
 def webhook(subpath):
     global should_restart
-
-    # Check for the security token in the request headers
+    # Check if subpath is a valid filepath if not kill 
+#    if re.match(r"^(\w+\:?)[\w\-\_\/\\]+$", subpath):
+        # Check for the security token in the request headers
     token = request.headers.get('X-Security-Token')
-    
     if DEBUG:
         logger.debug(f"Recieved token: {token}")
-    
     if token != SECURITY_TOKEN:
         logger.warning(f"Unauthorized access attempt with token: {token}")
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
@@ -72,7 +71,7 @@ def webhook(subpath):
     FULL_PATH = GIT_REPO_DIR + subpath
     
     try:
-        if os.path.isdir(FULL_PATH):
+        if os.path.isdir(FULL_PATH) and re.search(r"^(\w+\:?)[\w\-\_\/\\\.]+$", subpath): #check dir exists locally and only accept valid paths from subpath 
             logger.info(f"Full path of repo for update: {FULL_PATH}")
             # Perform Git operations
             subprocess.run(["git", "fetch"], cwd=FULL_PATH, check=True)
@@ -92,7 +91,9 @@ def webhook(subpath):
         error_message = f"Git pull failed: {e.stderr}"
         logger.error(error_message)
         return jsonify({"status": "error", "message": error_message}), 500
-
+    # else:
+    #     logger.critical(f"input after <url>/webhook/ not valid file path {subpath}") 
+        
 # Restarts server 
 def restart_server():
     global should_restart
