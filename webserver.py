@@ -14,17 +14,17 @@ def gather_arguments():
         usage="webserver.py --port 8080 --security-token true --git-repo-dir /var/www/",
         epilog="Test: curl -X POST -H \"X-Security-Token: 12345\" http://127.0.01/webhook/site")
     parser.add_argument('--git-repo-dir',
-                        required=True,
-                        help="Directory where the Git repository is located. Enter the path where the repo will be added to (parent folder where the repo will be downloaded)")
+        required=True,
+        help="Directory where the Git repository is located. Enter the path where the repo will be added to (parent folder where the repo will be downloaded)")
     parser.add_argument('--port',
-                        type=int,
-                        default=5123,
-                        help="Port on which the Flask app will listen. Default is 5123.")
+        type=int,
+        default=5123,
+        help="Port on which the Flask app will listen. Default is 5123.")
     parser.add_argument('--security-token',
-                        help="Security token required to access the webhook endpoint. Set token here.")
+        help="Security token required to access the webhook endpoint. Set token here.")
     parser.add_argument('--debug',
-                        action='store_true',
-                        help="WARNING: Insecure. Will display secrets")
+        action='store_true',
+        help="WARNING: Insecure. Will display secrets")
     args = parser.parse_args()
 
     # Define args
