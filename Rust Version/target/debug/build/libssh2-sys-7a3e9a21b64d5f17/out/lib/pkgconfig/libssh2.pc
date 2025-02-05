@@ -1,0 +1,21 @@
+###########################################################################
+# libssh2 installation details
+#
+# Copyright (C) The libssh2 project and its contributors.
+# SPDX-License-Identifier: BSD-3-Clause
+###########################################################################
+
+prefix=/Volumes/Code/remote_github/simple_hooks/Rust Version/target/debug/build/libssh2-sys-7a3e9a21b64d5f17/out
+exec_prefix=
+libdir=/Volumes/Code/remote_github/simple_hooks/Rust Version/target/debug/build/libssh2-sys-7a3e9a21b64d5f17/out/lib
+includedir=/Volumes/Code/remote_github/simple_hooks/Rust Version/target/debug/build/libssh2-sys-7a3e9a21b64d5f17/out/include
+
+Name: libssh2
+URL: https://libssh2.org/
+Description: Library for SSH-based communication
+Version: @LIBSSH2_VERSION@
+Requires: @LIBSSH2_PC_REQUIRES@
+Requires.private: @LIBSSH2_PC_REQUIRES_PRIVATE@
+Libs: -L${libdir} -lssh2 @LIBSSH2_PC_LIBS@
+Libs.private: @LIBSSH2_PC_LIBS_PRIVATE@
+Cflags: -I${includedir}

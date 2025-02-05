@@ -2,126 +2,195 @@ from flask import Flask, request, jsonify
 import os
 import threading
 import time
-import subprocess
+import git
 import logging
 import argparse
 import re
+from typing import Optional
+from dataclasses import dataclass
+from pathlib import Path
 
-def gather_arguments():
-    # Set up argument parsing
+@dataclass
+class ServerConfig:
+    """Server configuration container"""
+    git_repo_dir: Path
+    port: int
+    security_token: Optional[str]
+    debug: bool
+
+    def __post_init__(self):
+        # Ensure git_repo_dir is a Path object with trailing slash
+        self.git_repo_dir = Path(self.git_repo_dir).resolve() / ''
+
+class GitOperations:
+    """Handles all Git-related operations using GitPython"""
+    
+    @staticmethod
+    def update_repository(repo_path: Path) -> None:
+        """
+        Updates the git repository at the specified path
+        Raises git.GitCommandError if any git command fails
+        """
+        try:
+            repo = git.Repo(repo_path)
+            
+            # Reset any local changes
+            repo.head.reset(index=True, working_tree=True)
+            
+            # Clean untracked files
+            repo.git.clean('-fd')
+            
+            # Pull latest changes
+            origin = repo.remotes.origin
+            origin.pull()
+            
+        except git.GitCommandError as e:
+            raise git.GitCommandError(e.command, e.status, e.stderr)
+
+class WebhookServer:
+    """Main webhook server implementation"""
+    
+    def __init__(self, config: ServerConfig):
+        self.config = config
+        self.logger = self._setup_logging()
+        self.restart_lock = threading.Lock()
+        self.should_restart = False
+        self.app = self._create_app()
+
+    def _setup_logging(self) -> logging.Logger:
+        """Configure logging with appropriate format and level"""
+        logger = logging.getLogger(__name__)
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.DEBUG if self.config.debug else logging.INFO)
+        return logger
+
+    def _create_app(self) -> Flask:
+        """Create and configure Flask application"""
+        app = Flask(__name__)
+        
+        @app.route('/webhook/<path:subpath>', methods=['POST'])
+        def webhook(subpath: str):
+            return self._handle_webhook(subpath)
+        
+        return app
+
+    def _validate_security_token(self, token: Optional[str]) -> bool:
+        """Validate the security token from request"""
+        if self.config.security_token is None:
+            return True
+        if self.config.debug:
+            self.logger.debug(f"Received token: {token}")
+        return token == self.config.security_token
+
+    def _validate_path(self, subpath: str) -> bool:
+        """Validate the repository path"""
+        return bool(re.match(r"^[\w\-\_\/\\\.]+$", subpath))
+
+    def _handle_webhook(self, subpath: str):
+        """Handle incoming webhook requests"""
+        # Validate security token
+        token = request.headers.get('X-Security-Token')
+        if not self._validate_security_token(token):
+            self.logger.warning(f"Unauthorized access attempt")
+            return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+        # Validate and construct repository path
+        if not self._validate_path(subpath):
+            self.logger.error(f"Invalid repository path: {subpath}")
+            return jsonify({"status": "error", "message": "Invalid repository path"}), 400
+
+        repo_path = self.config.git_repo_dir / subpath
+        self.logger.info(f"Processing webhook for: {repo_path}")
+
+        # Verify repository exists
+        if not repo_path.is_dir():
+            self.logger.error(f"Repository directory not found: {repo_path}")
+            return jsonify({"status": "error", "message": "Repository not found"}), 404
+
+        try:
+            # Update repository
+            GitOperations.update_repository(repo_path)
+            
+            # Signal restart
+            with self.restart_lock:
+                self.should_restart = True
+            
+            return jsonify({"status": "success", "message": "Repository updated"}), 200
+
+        except git.GitCommandError as e:
+            error_msg = f"Git operation failed: {e.stderr}"
+            self.logger.error(error_msg)
+            return jsonify({"status": "error", "message": error_msg}), 500
+
+    def _monitor_restart(self):
+        """Monitor and handle server restart signals"""
+        while True:
+            with self.restart_lock:
+                if self.should_restart:
+                    self.logger.info("Restart signal received")
+                    self.should_restart = False
+                    # Touch a file in /tmp to trigger Flask's reloader
+                    restart_trigger = Path("/tmp/webhook_restart_trigger")
+                    restart_trigger.touch()
+            time.sleep(1)
+
+    def run(self):
+        """Start the webhook server"""
+        self.logger.info(f"Starting server on port {self.config.port}")
+        threading.Thread(target=self._monitor_restart, daemon=True).start()
+        self.app.run(
+            host='0.0.0.0',
+            port=self.config.port,
+            use_reloader=True
+        )
+
+def parse_arguments() -> ServerConfig:
+    """Parse command line arguments"""
     parser = argparse.ArgumentParser(
-        description="Flask server with Git webhook integration.",
-        usage="webserver.py --port 8080 --security-token true --git-repo-dir /var/www/",
-        epilog="Test: curl -X POST -H \"X-Security-Token: 12345\" http://127.0.01/webhook/site")
-    parser.add_argument('--git-repo-dir',
+        description="Flask server with Git webhook integration",
+        usage="%(prog)s --port 8080 --security-token TOKEN --git-repo-dir /var/www/",
+        epilog="Example: curl -X POST -H \"X-Security-Token: TOKEN\" http://localhost:8080/webhook/site"
+    )
+    
+    parser.add_argument(
+        '--git-repo-dir',
         required=True,
-        help="Directory where the Git repository is located. Enter the path where the repo will be added to (parent folder where the repo will be downloaded)")
-    parser.add_argument('--port',
+        help="Parent directory for Git repositories"
+    )
+    parser.add_argument(
+        '--port',
         type=int,
         default=5123,
-        help="Port on which the Flask app will listen. Default is 5123.")
-    parser.add_argument('--security-token',
-        help="Security token required to access the webhook endpoint. Set token here.")
-    parser.add_argument('--debug',
+        help="Port for the Flask server (default: 5123)"
+    )
+    parser.add_argument(
+        '--security-token',
+        help="Security token for webhook authentication"
+    )
+    parser.add_argument(
+        '--debug',
         action='store_true',
-        help="WARNING: Insecure. Will display secrets")
+        help="Enable debug mode (Warning: may expose sensitive information)"
+    )
+    
     args = parser.parse_args()
+    return ServerConfig(
+        git_repo_dir=args.git_repo_dir,
+        port=args.port,
+        security_token=args.security_token,
+        debug=args.debug
+    )
 
-    # Define args
-    global GIT_REPO_DIR
-    global LISTEN_PORT
-    global SECURITY_TOKEN
-    global DEBUG
-
-    GIT_REPO_DIR = args.git_repo_dir # Define the directory where your Git repository is located
-    LISTEN_PORT = args.port # Define the port on which the Flask app will listen
-    SECURITY_TOKEN = args.security_token # Define the security token
-    DEBUG = args.debug
-
-    return GIT_REPO_DIR, LISTEN_PORT, SECURITY_TOKEN, DEBUG
-
-gather_arguments()
-
-# Flag to indicate if the server should restart
-should_restart = False
-restart_lock = threading.Lock()
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-if DEBUG:
-    logger.info(f"Expecting security token: {SECURITY_TOKEN}")
-
-# Sanitize Inputs for --git-repo-dir to add trailing /
-if not re.search(r'/$', GIT_REPO_DIR):
-    GIT_REPO_DIR += "/" # If it doesn't, add a trailing slash
-    if DEBUG:
-        logger.debug(f"Missing trailing slash {GIT_REPO_DIR}")
-
-app = Flask(__name__)
-@app.route('/webhook/<path:subpath>', methods=['POST'])
-def webhook(subpath):
-    global should_restart
-    # Check if subpath is a valid filepath if not kill
-#    if re.match(r"^(\w+\:?)[\w\-\_\/\\]+$", subpath):
-        # Check for the security token in the request headers
-    token = request.headers.get('X-Security-Token')
-    if DEBUG:
-        logger.debug(f"Recieved token: {token}")
-    if token != SECURITY_TOKEN:
-        logger.warning(f"Unauthorized access attempt with token: {token}")
-        return jsonify({"status": "error", "message": "Unauthorized"}), 401
-
-    # Print "Received" when the webhook is hit
-    logger.info(f"Received webhook for subpath: {subpath}")
-
-    FULL_PATH = GIT_REPO_DIR + subpath
-    if re.search(r"^(\w+\:?)[\w\-\_\/\\\.]+$", subpath): #caccept valid paths from subpath
-        try:
-            if os.path.isdir(FULL_PATH): #check dir exists locally
-                logger.info(f"Full path of repo for update: {FULL_PATH}")
-                # Perform Git operations
-                subprocess.run(["git", "reset", "--hard"], cwd=FULL_PATH, check=True)
-                subprocess.run(["git", "clean", "-fd"], cwd=FULL_PATH, check=True)
-                subprocess.run(["git", "pull"], cwd=FULL_PATH, check=True)
-
-                # Set the restart flag
-                with restart_lock:
-                    should_restart = True
-
-                return jsonify({"status": "success", "message": "Git pull successful"}), 200
-            else:
-                logger.critical(f"Directory doesn't exist: {FULL_PATH}")
-                return jsonify({"status": "error", "message": "repo doesn't exist"}), 500
-
-        except subprocess.CalledProcessError as e:
-            # Log the error
-            error_message = f"Git pull failed: {e.stderr}"
-            logger.error(error_message)
-            return jsonify({"status": "error", "message": error_message}), 500
-    else:
-        logger.critical(f"input after <url>/webhook/ not valid file path {subpath}")
-
-# Restarts server
-def restart_server():
-    global should_restart
-    while True:
-        with restart_lock:
-            if should_restart:
-                logger.info("Restarting server...")
-                # Reset the flag
-                should_restart = False
-                # Trigger a reload by modifying a file (e.g., app.py)
-                with open(__file__, 'a'):
-                    os.utime(__file__, None)
-        time.sleep(1)
+def main():
+    """Main entry point"""
+    config = parse_arguments()
+    server = WebhookServer(config)
+    server.run()
 
 if __name__ == '__main__':
-    # Start the restart monitor thread
-    threading.Thread(target=restart_server, daemon=True).start()
-
-    # Run the Flask app on the specified port
-    logger.info(f"Starting Flask server on port {LISTEN_PORT}...")
-
-    app.run(host='0.0.0.0', port=LISTEN_PORT, use_reloader=True)
+    main()

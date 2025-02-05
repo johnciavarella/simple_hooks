@@ -1,0 +1,12 @@
+/Volumes/Code/remote_github/simple_hooks/target/debug/deps/libtinystr-35b3575d25001e18.rmeta: /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/lib.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/macros.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/ascii.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/asciibyte.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/error.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/int_ops.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/unvalidated.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/ule.rs
+
+/Volumes/Code/remote_github/simple_hooks/target/debug/deps/tinystr-35b3575d25001e18.d: /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/lib.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/macros.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/ascii.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/asciibyte.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/error.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/int_ops.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/unvalidated.rs /Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/ule.rs
+
+/Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/lib.rs:
+/Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/macros.rs:
+/Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/ascii.rs:
+/Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/asciibyte.rs:
+/Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/error.rs:
+/Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/int_ops.rs:
+/Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/unvalidated.rs:
+/Users/john/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinystr-0.7.6/src/ule.rs:
